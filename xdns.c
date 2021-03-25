@@ -24,6 +24,7 @@ static struct xrecord *parse_authority_section(struct xdns_header *dns_header,
 						unsigned char **record_pos, unsigned char *buffer);
 static struct xrecord *parse_additional_section(struct xdns_header *dns_header,
 						 unsigned char **record_pos, unsigned char *buffer);
+static void section_free(struct xrecord *section);
 
 
 int xdns_client_init(struct xdns_client *xdns_client, char *dns_server, const char *host)
@@ -50,51 +51,9 @@ int xdns_client_init(struct xdns_client *xdns_client, char *dns_server, const ch
 
 void xdns_client_destroy(struct xdns_client *xdns_client)
 {
-	struct xrecord **record;
-
-	record = &xdns_client->answer_section;
-
-	while (*record) {
-		struct xrecord *curr = *record;
-		*record = (*record)->next;
-
-		if (curr->name)
-			free(curr->name);
-
-		if (curr->rdata)
-			free(curr->rdata);
-
-		free(curr);
-	}
-
-	record = &xdns_client->authority_section;
-	while (*record) {
-		struct xrecord *curr = *record;
-		*record = (*record)->next;
-
-		if (curr->name)
-			free(curr->name);
-
-		if (curr->rdata)
-			free(curr->rdata);
-
-		free(curr);
-	}
-
-	record = &xdns_client->additional_section;
-	while (*record) {
-		struct xrecord *curr = *record;
-		*record = (*record)->next;
-
-		if (curr->name)
-			free(curr->name);
-
-		if (curr->rdata)
-			free(curr->rdata);
-
-		free(curr);
-	}
-
+	section_free(xdns_client->answer_section);
+	section_free(xdns_client->authority_section);
+	section_free(xdns_client->additional_section);
 	close(xdns_client->fd);
 }
 
@@ -159,20 +118,20 @@ void xdns_client_print_answer(struct xdns_client *xdns_client)
 		printf("Name: %s ", head->name);
 		if (head->resource->type == XDNS_TYPE_A) {
 			struct sockaddr_in addr;
-			addr.sin_addr.s_addr = *(long *)head->rdata;
+			addr.sin_addr.s_addr = *(long *)head->rdata.address;
 			printf("has IPv4 address: %s", inet_ntoa(addr.sin_addr));
 		}
 
 		if (head->resource->type == XDNS_TYPE_AAAA) {
 			struct sockaddr_in6 addr;
 			char ipv6[INET6_ADDRSTRLEN];
-			memcpy(&addr.sin6_addr.s6_addr, head->rdata, 16);
-			inet_ntop(AF_INET6, head->rdata, ipv6, INET6_ADDRSTRLEN);
+			memcpy(&addr.sin6_addr.s6_addr, head->rdata.address, 16);
+			inet_ntop(AF_INET6, head->rdata.address, ipv6, INET6_ADDRSTRLEN);
 			printf("has IPv6 address: %s", ipv6);
 		}
 		
 		if (head->resource->type == XDNS_TYPE_CNAME) {
-			printf("has alias name: %s", head->rdata);
+			printf("has alias name: %s", head->rdata.rname);
 		}
 
 		head = head->next;
@@ -188,7 +147,7 @@ void xdns_client_print_authority(struct xdns_client *xdns_client)
 	while (head) {
 		printf("Name: %s ", head->name);
 		if (head->resource->type == XDNS_TYPE_NS) {
-			printf("has nameserver: %s", head->rdata);
+			printf("has nameserver: %s", head->rdata.rname);
 		}
 
 		if (head->resource->type == XDNS_TYPE_SOA) {
@@ -209,7 +168,7 @@ void xdns_client_print_additional(struct xdns_client *xdns_client)
 		printf("Name: %s ", head->name);
 		if (head->resource->type == XDNS_TYPE_A) {
 			struct sockaddr_in addr;
-			addr.sin_addr.s_addr = *(long *)head->rdata;
+			addr.sin_addr.s_addr = *(long *)head->rdata.address;
 			printf("has IPv4 address: %s", inet_ntoa(addr.sin_addr));
 		}
 		head = head->next;
@@ -272,7 +231,7 @@ static unsigned char *parse_name(unsigned char *record_pos, unsigned char *buffe
 
 static void set_qname(unsigned char *qname, unsigned char *host) 
 {
-	int dot = 0 , i;
+	int dot = 0, i;
 	strcat((char *)host, ".");
 	
 	for (i = 0 ; i < strlen((char *)host); i++) {
@@ -355,16 +314,20 @@ static struct xrecord *parse_answer_section(struct xdns_header *dns_header,
 			answer->resource->rdata_len);
 
 		if (answer->resource->type == XDNS_TYPE_A || answer->resource->type == XDNS_TYPE_AAAA) {
-			answer->rdata = (unsigned char*)malloc(answer->resource->rdata_len + 1);
+			answer->rdata.address = (unsigned char *)malloc(answer->resource->rdata_len + 1);
 			for (j = 0; j < answer->resource->rdata_len; j++) {
-				answer->rdata[j] = (*record_pos)[j];
+				answer->rdata.address[j] = (*record_pos)[j];
 			}
 
-			answer->rdata[answer->resource->rdata_len] = '\0';
+			answer->rdata.address[answer->resource->rdata_len] = '\0';
 			*record_pos = *record_pos + answer->resource->rdata_len;
-		} else {
-			answer->rdata = parse_name(*record_pos, buffer, &offset);
+                } else if (answer->resource->type == XDNS_TYPE_NS ||
+			   answer->resource->type == XDNS_TYPE_CNAME)
+		{
+			answer->rdata.rname = parse_name(*record_pos, buffer, &offset);
 			*record_pos = *record_pos + offset;
+		} else {
+                        printf("unimplement\n");
 		}
 
 		if (answer_section == NULL) {
@@ -413,7 +376,7 @@ static struct xrecord *parse_authority_section(struct xdns_header *dns_header,
 
 		*record_pos += sizeof(struct xresource);
 
-		auth->rdata = parse_name(*record_pos, buffer, &offset);
+		auth->rdata.rname = parse_name(*record_pos, buffer, &offset);
 		*record_pos += offset;
 
 		if (authority_section == NULL) {
@@ -462,15 +425,15 @@ static struct xrecord *parse_additional_section(struct xdns_header *dns_header,
 
 		*record_pos += sizeof(struct xresource);
 
-		if (addit->resource->type == XDNS_TYPE_A) {
-			addit->rdata = (unsigned char*)malloc(addit->resource->rdata_len + 1);
+		if (addit->resource->type == XDNS_TYPE_A || addit->resource->type == XDNS_TYPE_AAAA) {
+			addit->rdata.address = (unsigned char *)malloc(addit->resource->rdata_len + 1);
 			for (j = 0; j < addit->resource->rdata_len; j++)
-				addit->rdata[j] = (*record_pos)[j];
+				addit->rdata.address[j] = (*record_pos)[j];
 
-			addit->rdata[addit->resource->rdata_len] = '\0';
+			addit->rdata.address[addit->resource->rdata_len] = '\0';
 			*record_pos += ntohs(addit->resource->rdata_len);
 		} else {
-			addit->rdata = parse_name(*record_pos, buffer, &offset);
+			addit->rdata.rname = parse_name(*record_pos, buffer, &offset);
 			*record_pos += offset;
 		}
 
@@ -489,5 +452,26 @@ static struct xrecord *parse_additional_section(struct xdns_header *dns_header,
 	}
 
 	return additional_section;
+}
+
+static void section_free(struct xrecord *section)
+{
+	struct xrecord **record = &section;
+	while (*record) {
+		struct xrecord *curr = *record;
+		*record = (*record)->next;
+
+		if (curr->name)
+			free(curr->name);
+
+		if (curr->resource->type == XDNS_TYPE_A || curr->resource->type == XDNS_TYPE_AAAA)
+			free(curr->rdata.address);
+
+
+		if (curr->resource->type == XDNS_TYPE_CNAME || curr->resource->type == XDNS_TYPE_NS)
+			free(curr->rdata.rname);
+
+		free(curr);
+	}
 }
 

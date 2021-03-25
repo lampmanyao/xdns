@@ -101,10 +101,10 @@ struct xdns_question {
 
 #pragma pack(push, 1)
 struct xresource {
-	uint16_t type;    /* This field specifies the meaning of the data in the RDATA field */
-	uint16_t class;   /* which specify the class of the data in the RDATA field */
-	uint32_t ttl;     /*  the time interval that the resource record may be cached 
-			      before the source of the information should again be consulted */
+	uint16_t type;       /* This field specifies the meaning of the data in the RDATA field */
+	uint16_t class;      /* which specify the class of the data in the RDATA field */
+	uint32_t ttl;        /*  the time interval that the resource record may be cached 
+			         before the source of the information should again be consulted */
 	uint16_t rdata_len;  /* specifies the length in octets of the RDATA field */
 };
 #pragma pack(pop)
@@ -112,7 +112,10 @@ struct xresource {
 struct xrecord {
 	unsigned char *name;
 	struct xresource *resource;
-	unsigned char *rdata;
+	union {
+		unsigned char *address;  /* A or AAAA rdata */
+		unsigned char *rname;   /* NS or cname rdata */
+	} rdata;
 	struct xrecord *next;
 };
 
