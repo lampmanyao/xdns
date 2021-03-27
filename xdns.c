@@ -231,7 +231,7 @@ static unsigned char *parse_name(unsigned char *record_pos, unsigned char *buffe
 
 static void set_qname(unsigned char *qname, unsigned char *host) 
 {
-	int dot = 0, i;
+	unsigned int dot = 0, i;
 	strcat((char *)host, ".");
 	
 	for (i = 0 ; i < strlen((char *)host); i++) {

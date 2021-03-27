@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -O0 -ggdb
+CFLAGS = -Wall -Werror -Wextra -O0 -ggdb
 OBJ = main.o xdns.o 
 
 %.o: %.c
