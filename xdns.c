@@ -1,14 +1,14 @@
 #include "xdns.h"
 
-#include <stdio.h> 
+#include <stdio.h>
 #include <stdlib.h>  /* malloc() */
 #include <unistd.h>  /* getpid() */
-#include <string.h> 
+#include <string.h>
 #include <errno.h>
-#include <sys/types.h> 
-#include <sys/socket.h> 
-#include <arpa/inet.h> 
-#include <netinet/in.h> 
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
 #include <netdb.h>
 
 #define PORT 53
@@ -129,7 +129,7 @@ void xdns_client_print_answer(struct xdns_client *xdns_client)
 			inet_ntop(AF_INET6, head->rdata.address, ipv6, INET6_ADDRSTRLEN);
 			printf("has IPv6 address: %s", ipv6);
 		}
-		
+
 		if (head->resource->type == XDNS_TYPE_CNAME) {
 			printf("has alias name: %s", head->rdata.rname);
 		}
@@ -153,7 +153,8 @@ void xdns_client_print_authority(struct xdns_client *xdns_client)
 		}
 
 		if (head->resource->type == XDNS_TYPE_SOA) {
-			printf("%s %d %d %d %d %d\n",
+			printf("%s %s %d %d %d %d %d\n",
+				head->rdata.soa_data.rname,
 				head->rdata.soa_data.mname,
 				head->rdata.soa_data.resource->serial,
 				head->rdata.soa_data.resource->refresh,
@@ -239,11 +240,11 @@ static unsigned char *parse_name(unsigned char *record_pos, unsigned char *buffe
 	return name;
 }
 
-static void set_qname(unsigned char *qname, unsigned char *host) 
+static void set_qname(unsigned char *qname, unsigned char *host)
 {
 	unsigned int dot = 0, i;
 	strcat((char *)host, ".");
-	
+
 	for (i = 0 ; i < strlen((char *)host); i++) {
 		if (host[i] == '.') {
 			*qname++ = i - dot;
@@ -386,10 +387,10 @@ static struct xrecord *parse_authority_section(struct xdns_header *dns_header,
 
 		*record_pos += sizeof(struct xresource);
 
-		auth->rdata.rname = parse_name(*record_pos, buffer, &offset);
-		*record_pos += offset;
-
 		if (auth->resource->type == XDNS_TYPE_SOA) {
+			auth->rdata.soa_data.rname = parse_name(*record_pos, buffer, &offset);
+			*record_pos += offset;
+
 			auth->rdata.soa_data.mname = parse_name(*record_pos, buffer, &offset);
 			*record_pos += offset;
 
@@ -504,4 +505,3 @@ static void section_free(struct xrecord *section)
 		free(curr);
 	}
 }
-
