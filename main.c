@@ -24,6 +24,10 @@ static int type2qtype(const char *type, uint16_t *qtype)
 		*qtype = XDNS_TYPE_A;
 	} else if (strcmp(type, "AAAA") == 0) {
 		*qtype = XDNS_TYPE_AAAA;
+	} else if (strcmp(type, "MX") == 0) {
+		*qtype = XDNS_TYPE_MX;
+	} else if (strcmp(type, "HINFO") == 0) {
+		*qtype = XDNS_TYPE_HINFO;
 	} else {
 		ret = -1;
 	}

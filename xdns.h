@@ -109,12 +109,27 @@ struct xresource {
 };
 #pragma pack(pop)
 
+struct soa_resource {
+	uint32_t serial;
+	int32_t refresh;
+	int32_t retry;
+	int32_t expire;
+	uint32_t minimum;
+};
+
+struct soa {
+	unsigned char *mname;
+	unsigned char *rname;
+	struct soa_resource *resource;
+};
+
 struct xrecord {
 	unsigned char *name;
 	struct xresource *resource;
 	union {
 		unsigned char *address;  /* A or AAAA rdata */
 		unsigned char *rname;   /* NS or cname rdata */
+		struct soa soa_data;
 	} rdata;
 	struct xrecord *next;
 };

@@ -137,6 +137,7 @@ void xdns_client_print_answer(struct xdns_client *xdns_client)
 		head = head->next;
 		printf("\n");
 	}
+	printf("\n");
 }
 
 void xdns_client_print_authority(struct xdns_client *xdns_client)
@@ -146,17 +147,25 @@ void xdns_client_print_authority(struct xdns_client *xdns_client)
 	struct xrecord *head = xdns_client->authority_section;
 	while (head) {
 		printf("Name: %s ", head->name);
+
 		if (head->resource->type == XDNS_TYPE_NS) {
 			printf("has nameserver: %s", head->rdata.rname);
 		}
 
 		if (head->resource->type == XDNS_TYPE_SOA) {
-			
+			printf("%s %d %d %d %d %d\n",
+				head->rdata.soa_data.mname,
+				head->rdata.soa_data.resource->serial,
+				head->rdata.soa_data.resource->refresh,
+				head->rdata.soa_data.resource->retry,
+				head->rdata.soa_data.resource->expire,
+				head->rdata.soa_data.resource->minimum);
 		}
 
 		head = head->next;
 		printf("\n");
 	}
+	printf("\n");
 }
 
 void xdns_client_print_additional(struct xdns_client *xdns_client)
@@ -174,6 +183,7 @@ void xdns_client_print_additional(struct xdns_client *xdns_client)
 		head = head->next;
 		printf("\n");
 	}
+	printf("\n");
 }
 
 
@@ -379,6 +389,18 @@ static struct xrecord *parse_authority_section(struct xdns_header *dns_header,
 		auth->rdata.rname = parse_name(*record_pos, buffer, &offset);
 		*record_pos += offset;
 
+		if (auth->resource->type == XDNS_TYPE_SOA) {
+			auth->rdata.soa_data.mname = parse_name(*record_pos, buffer, &offset);
+			*record_pos += offset;
+
+			auth->rdata.soa_data.resource = (struct soa_resource *)(*record_pos);
+			auth->rdata.soa_data.resource->serial = ntohl(auth->rdata.soa_data.resource->serial);
+			auth->rdata.soa_data.resource->refresh = ntohl(auth->rdata.soa_data.resource->refresh);
+			auth->rdata.soa_data.resource->retry = ntohl(auth->rdata.soa_data.resource->retry);
+			auth->rdata.soa_data.resource->expire = ntohl(auth->rdata.soa_data.resource->expire);
+			auth->rdata.soa_data.resource->minimum = ntohl(auth->rdata.soa_data.resource->minimum);
+		}
+
 		if (authority_section == NULL) {
 			authority_section = auth;
 		} else {
@@ -470,6 +492,14 @@ static void section_free(struct xrecord *section)
 
 		if (curr->resource->type == XDNS_TYPE_CNAME || curr->resource->type == XDNS_TYPE_NS)
 			free(curr->rdata.rname);
+
+		if (curr->resource->type == XDNS_TYPE_SOA) {
+			if (curr->rdata.soa_data.mname)
+				free(curr->rdata.soa_data.mname);
+
+			if (curr->rdata.soa_data.rname)
+				free(curr->rdata.soa_data.rname);
+		}
 
 		free(curr);
 	}
