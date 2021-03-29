@@ -7,12 +7,15 @@
 
 #define PROGRAM "xdns"
 
+extern int xdns_debug;
+
 static void usage()
 {
 	printf("Usage: %s options\n", PROGRAM);
 	printf(" --server    the dns server to query\n");
 	printf(" --host      the name of the resource record that is to be looked up\n");
 	printf(" --type      the resource record type to query\n");
+	printf(" --debug     debug mode, print send data and receive data\n");
 	printf(" --help      print this message\n");
 	exit(-1);
 }
@@ -28,6 +31,8 @@ static int type2qtype(const char *type, uint16_t *qtype)
 		*qtype = XDNS_TYPE_MX;
 	} else if (strcmp(type, "HINFO") == 0) {
 		*qtype = XDNS_TYPE_HINFO;
+	} else if (strcmp(type, "CNAME") == 0) {
+		*qtype = XDNS_TYPE_CNAME;
 	} else {
 		ret = -1;
 	}
@@ -49,7 +54,8 @@ int main(int argc, char **argv)
 		{ "server", brequired_argument, 's', &server},
 		{ "host",   brequired_argument, 'h', &host },
 		{ "type",   boptional_argument, 't', &type },
-		{ "help",   bno_argument,       'H', NULL, },
+		{ "debug",  bno_argument,       'd', NULL },
+		{ "help",   bno_argument,       'H', NULL },
 		{ NULL, 0, 0, NULL }
 	};
 
@@ -65,6 +71,10 @@ int main(int argc, char **argv)
 
 		case 't':
 			type = boptarg;
+			break;
+
+		case 'd':
+			xdns_debug = 1;
 			break;
 
 		case 'H':

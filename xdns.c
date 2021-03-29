@@ -5,6 +5,7 @@
 #include <unistd.h>  /* getpid() */
 #include <string.h>
 #include <errno.h>
+#include <ctype.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -12,6 +13,8 @@
 #include <netdb.h>
 
 #define PORT 53
+
+int xdns_debug = 0;
 
 static void set_qname(unsigned char *qname, unsigned char *host);
 static void set_dns_header(struct xdns_header *dns_header);
@@ -25,6 +28,7 @@ static struct xrecord *parse_authority_section(struct xdns_header *dns_header,
 static struct xrecord *parse_additional_section(struct xdns_header *dns_header,
 						 unsigned char **record_pos, unsigned char *buffer);
 static void section_free(struct xrecord *section);
+static void print_hex(unsigned char *buff, size_t len);
 
 
 int xdns_client_init(struct xdns_client *xdns_client, char *dns_server, const char *host)
@@ -51,6 +55,14 @@ int xdns_client_init(struct xdns_client *xdns_client, char *dns_server, const ch
 
 void xdns_client_destroy(struct xdns_client *xdns_client)
 {
+	if (xdns_debug) {
+		printf("send data:\n");
+		print_hex(xdns_client->sbuf, xdns_client->slen);
+
+		printf("\nrecv data:\n");
+		print_hex(xdns_client->rbuf, xdns_client->rlen);
+	}
+
 	section_free(xdns_client->answer_section);
 	section_free(xdns_client->authority_section);
 	section_free(xdns_client->additional_section);
@@ -60,7 +72,6 @@ void xdns_client_destroy(struct xdns_client *xdns_client)
 int xdns_client_query(struct xdns_client *xdns_client, uint16_t qtype, uint16_t qclass)
 {
 	ssize_t ret;
-	size_t len;
 	unsigned char *record_pos;
 	socklen_t dest_len;
 
@@ -79,10 +90,12 @@ int xdns_client_query(struct xdns_client *xdns_client, uint16_t qtype, uint16_t 
 			strlen((char *)xdns_client->qname) + 1];
 	set_dns_question(dns_question, qtype, qclass);
 
-	len = sizeof(struct xdns_header) + strlen((char *)xdns_client->qname) + 1 + sizeof(struct xdns_question);
+	xdns_client->slen = sizeof(struct xdns_header) + strlen((char *)xdns_client->qname) + 1 +
+			    sizeof(struct xdns_question);
 
-	ret = sendto(xdns_client->fd, (char *)xdns_client->sbuf, len, 0,
-		     (struct sockaddr *)&xdns_client->dest, sizeof(xdns_client->dest));
+	ret = sendto(xdns_client->fd, (char *)xdns_client->sbuf, xdns_client->slen, 0,
+		     (struct sockaddr *)&xdns_client->dest, sizeof(xdns_client->dest));	
+
 	if (ret < 0) {
 		return -1;
 	}
@@ -90,9 +103,12 @@ int xdns_client_query(struct xdns_client *xdns_client, uint16_t qtype, uint16_t 
 	dest_len = sizeof(xdns_client->dest);
 	ret = recvfrom(xdns_client->fd, (char *)xdns_client->rbuf, BUFF_SIZE, 0,
 			(struct sockaddr *)&xdns_client->dest, &dest_len);
+	
 	if (ret < 0) {
 		return -1;
 	}
+
+	xdns_client->rlen = ret;
 
 	dns_header = (struct xdns_header *)xdns_client->rbuf;
 	print_dns_header(dns_header);
@@ -110,16 +126,17 @@ int xdns_client_query(struct xdns_client *xdns_client, uint16_t qtype, uint16_t 
 
 void xdns_client_print_answer(struct xdns_client *xdns_client)
 {
-	printf("ANSWER SECTION:\n");
-
 	struct xrecord *head = xdns_client->answer_section;
 
+	if (head)
+		printf("ANSWER SECTION:\n");
+
 	while (head) {
-		printf("Name: %s ", head->name);
+		printf("%s ", head->name);
 		if (head->resource->type == XDNS_TYPE_A) {
 			struct sockaddr_in addr;
 			addr.sin_addr.s_addr = *(long *)head->rdata.address;
-			printf("has IPv4 address: %s", inet_ntoa(addr.sin_addr));
+			printf("A %s", inet_ntoa(addr.sin_addr));
 		}
 
 		if (head->resource->type == XDNS_TYPE_AAAA) {
@@ -127,33 +144,34 @@ void xdns_client_print_answer(struct xdns_client *xdns_client)
 			char ipv6[INET6_ADDRSTRLEN];
 			memcpy(&addr.sin6_addr.s6_addr, head->rdata.address, 16);
 			inet_ntop(AF_INET6, head->rdata.address, ipv6, INET6_ADDRSTRLEN);
-			printf("has IPv6 address: %s", ipv6);
+			printf("AAAA %s", ipv6);
 		}
 
 		if (head->resource->type == XDNS_TYPE_CNAME) {
-			printf("has alias name: %s", head->rdata.rname);
+			printf("CNAME %s", head->rdata.rname);
 		}
 
 		head = head->next;
 		printf("\n");
 	}
-	printf("\n");
 }
 
 void xdns_client_print_authority(struct xdns_client *xdns_client)
 {
-	printf("AUTHORITY SECTION:\n");
-
 	struct xrecord *head = xdns_client->authority_section;
+
+	if (head)
+		printf("AUTHORITY SECTION:\n");
+
 	while (head) {
-		printf("Name: %s ", head->name);
+		printf("%s ", head->name);
 
 		if (head->resource->type == XDNS_TYPE_NS) {
-			printf("has nameserver: %s", head->rdata.rname);
+			printf("NS %s", head->rdata.rname);
 		}
 
 		if (head->resource->type == XDNS_TYPE_SOA) {
-			printf("%s %s %d %d %d %d %d\n",
+			printf("SOA %s %s %d %d %d %d %d\n",
 				head->rdata.soa_data.rname,
 				head->rdata.soa_data.mname,
 				head->rdata.soa_data.resource->serial,
@@ -166,16 +184,17 @@ void xdns_client_print_authority(struct xdns_client *xdns_client)
 		head = head->next;
 		printf("\n");
 	}
-	printf("\n");
 }
 
 void xdns_client_print_additional(struct xdns_client *xdns_client)
 {
-	printf("ADDITIONAL SECTION:\n");
-
 	struct xrecord *head = xdns_client->additional_section;
+
+	if (head)
+		printf("ADDITIONAL SECTION:\n");
+
 	while (head) {
-		printf("Name: %s ", head->name);
+		printf("%s ", head->name);
 		if (head->resource->type == XDNS_TYPE_A) {
 			struct sockaddr_in addr;
 			addr.sin_addr.s_addr = *(long *)head->rdata.address;
@@ -184,7 +203,6 @@ void xdns_client_print_additional(struct xdns_client *xdns_client)
 		head = head->next;
 		printf("\n");
 	}
-	printf("\n");
 }
 
 
@@ -318,12 +336,6 @@ static struct xrecord *parse_answer_section(struct xdns_header *dns_header,
 
 		*record_pos = *record_pos + sizeof(struct xresource);
 
-		printf("type: %d, class: %d, ttl: %d, rdata_len: %d\n",
-			answer->resource->type,
-			answer->resource->class,
-			answer->resource->ttl,
-			answer->resource->rdata_len);
-
 		if (answer->resource->type == XDNS_TYPE_A || answer->resource->type == XDNS_TYPE_AAAA) {
 			answer->rdata.address = (unsigned char *)malloc(answer->resource->rdata_len + 1);
 			for (j = 0; j < answer->resource->rdata_len; j++) {
@@ -378,12 +390,6 @@ static struct xrecord *parse_authority_section(struct xdns_header *dns_header,
 		auth->resource->class = ntohs(auth->resource->class);
 		auth->resource->ttl = ntohl(auth->resource->ttl);
 		auth->resource->rdata_len = ntohs(auth->resource->rdata_len);
-
-		printf("type: %d, class: %d, ttl: %d, rdata_len: %d\n",
-			auth->resource->type,
-			auth->resource->class,
-			auth->resource->ttl,
-			auth->resource->rdata_len);
 
 		*record_pos += sizeof(struct xresource);
 
@@ -505,3 +511,53 @@ static void section_free(struct xrecord *section)
 		free(curr);
 	}
 }
+
+
+static void print_hex(unsigned char *buff, size_t len)
+{
+	size_t nline = len / 16;
+	size_t remaining = len % 16;
+	unsigned char *c = buff;
+	unsigned char *h = buff;
+
+	int linenum = 0;
+	for (size_t i = 0; i < nline; i++) {
+		printf("%08x  ", linenum++);
+		for (int j = 0; j < 16; j++) {
+			printf("%02x ", *c++);
+		}
+
+		printf("  ");
+
+		for (int j = 0; j < 16; j++) {
+			if (isprint(*h) != 0) {
+				printf("%c", *h);
+			} else {
+				printf(".");
+			}
+			h++;
+		}
+		printf("\n");
+	}
+
+	printf("%08x  ", linenum++);
+	for (size_t i = 0; i < remaining; i++) {
+		printf("%02x ", *c++);
+	}
+
+	for (size_t i = 0; i < 16 - remaining + 1; i++) {
+		printf("   ");
+	}
+
+	for (size_t i = 0; i < remaining; i++) {
+		if (isprint(*h) != 0) {
+			printf("%c", *h);
+		} else {
+			printf(".");
+		}
+		h++;
+	}
+
+	printf("\n");
+}
+

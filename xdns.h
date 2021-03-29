@@ -136,8 +136,12 @@ struct xrecord {
 
 struct xdns_client {
 	int fd;
+
 	struct sockaddr_in dest;
 	unsigned char *qname;
+
+	size_t slen;
+	ssize_t rlen;
 
 	struct xrecord *answer_section;
 	struct xrecord *authority_section;
