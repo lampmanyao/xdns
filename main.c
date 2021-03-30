@@ -11,8 +11,9 @@ extern int xdns_debug;
 
 static void usage()
 {
-	printf("Usage: %s options\n", PROGRAM);
+	printf("Usage: %s --server dns_server [--ipv6] --host host --type qtype [--debug] \n", PROGRAM);
 	printf(" --server    the dns server to query\n");
+	printf(" --ipv6      use IPv6 dns server, default is IPv4 dns server\n");
 	printf(" --host      the name of the resource record that is to be looked up\n");
 	printf(" --type      the resource record type to query\n");
 	printf(" --debug     debug mode, print send data and receive data\n");
@@ -46,6 +47,7 @@ int main(int argc, char **argv)
 	char *server;
 	char *host;
 	char *type = NULL;
+	int inet = XDNS_INET4;
 
 	struct xdns_client xdns_client;
 	uint16_t qtype = XDNS_TYPE_A;  /* default query type */
@@ -55,6 +57,7 @@ int main(int argc, char **argv)
 		{ "host",   brequired_argument, 'h', &host },
 		{ "type",   boptional_argument, 't', &type },
 		{ "debug",  bno_argument,       'd', NULL },
+		{ "ipv6",   bno_argument,       'p', NULL},
 		{ "help",   bno_argument,       'H', NULL },
 		{ NULL, 0, 0, NULL }
 	};
@@ -77,6 +80,10 @@ int main(int argc, char **argv)
 			xdns_debug = 1;
 			break;
 
+		case 'p':
+			inet = XDNS_INET6;
+			break;
+
 		case 'H':
 			usage();
 			break;
@@ -94,12 +101,12 @@ int main(int argc, char **argv)
 
 	if (type) {
 		if (type2qtype(type, &qtype) != 0) {
-			printf("type: %s is not support\n", type);
+			printf("type: %s is not support yet\n", type);
 			exit(-1);
 		}
 	}
 
-	if (xdns_client_init(&xdns_client, server, host) < 0) {
+	if (xdns_client_init(&xdns_client, server, inet, host) < 0) {
 		printf("xdns_client_init() error\n");
 		exit(-1);
 	}

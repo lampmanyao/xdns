@@ -2,10 +2,14 @@
 #define xdns_h
 
 #include <stdint.h>
+#include <netdb.h>
 #include <arpa/inet.h> 
 
 #define BUFF_SIZE 65536
 #define HOST_SIZE 512
+
+#define XDNS_INET4 AF_INET
+#define XDNS_INET6 AF_INET6
 
 /*
  * QR
@@ -137,11 +141,14 @@ struct xrecord {
 struct xdns_client {
 	int fd;
 
-	struct sockaddr_in dest;
-	unsigned char *qname;
+	int inet; /* AF_INET or AF_INET6 */
 
-	size_t slen;
-	ssize_t rlen;
+	union {
+		struct sockaddr_in addr4;
+		struct sockaddr_in6 addr6;
+	} srv_addr;
+
+	unsigned char *qname;
 
 	struct xrecord *answer_section;
 	struct xrecord *authority_section;
@@ -149,12 +156,16 @@ struct xdns_client {
 
 	char dns_server[HOST_SIZE];
 	unsigned char host[HOST_SIZE];
+
+	size_t slen;
 	unsigned char sbuf[BUFF_SIZE];
+
+	ssize_t rlen;
 	unsigned char rbuf[BUFF_SIZE];
 };
 
-int xdns_client_init(struct xdns_client *xdns_client, char *dns_server, const char *host);
-void xdns_client_destroy(struct xdns_client *xdns);
+int xdns_client_init(struct xdns_client *xdns_client, const char *dns_server, int inet, const char *host);
+void xdns_client_destroy(struct xdns_client *xdns_client);
 
 int xdns_client_query(struct xdns_client *xdns_client, uint16_t qtype, uint16_t qclass);
 void xdns_client_print_answer(struct xdns_client *xdns_client);

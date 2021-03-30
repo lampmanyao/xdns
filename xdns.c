@@ -31,24 +31,41 @@ static void section_free(struct xrecord *section);
 static void print_hex(unsigned char *buff, size_t len);
 
 
-int xdns_client_init(struct xdns_client *xdns_client, char *dns_server, const char *host)
+int xdns_client_init(struct xdns_client *xdns_client, const char *dns_server, int inet, const char *host)
 {
-	strcpy(xdns_client->dns_server, dns_server);
+	xdns_client->inet = inet;
+
+	strncpy(xdns_client->dns_server, dns_server, HOST_SIZE - 1);
+	xdns_client->dns_server[HOST_SIZE - 1] = '\0';
+
 	strncpy((char *)xdns_client->host, host, HOST_SIZE - 1);
 	xdns_client->host[HOST_SIZE - 1] = '\0';
-
-	xdns_client->fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-	if (xdns_client->fd < 0) {
-		return -1;
-	}
 
 	xdns_client->answer_section = NULL;
 	xdns_client->authority_section = NULL;
 	xdns_client->additional_section = NULL;
 
-	xdns_client->dest.sin_family = AF_INET;
-	xdns_client->dest.sin_port = htons(53);
-	xdns_client->dest.sin_addr.s_addr = inet_addr(dns_server);
+	if (inet == XDNS_INET6) {
+		xdns_client->fd = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
+		if (xdns_client->fd < 0) {
+			return -1;
+		}
+		memset(&xdns_client->srv_addr.addr6, 0, sizeof(struct sockaddr_in6));
+		xdns_client->srv_addr.addr6.sin6_family = AF_INET6;
+		xdns_client->srv_addr.addr6.sin6_port = htons(53);
+
+		if (inet_pton(AF_INET6, dns_server, &xdns_client->srv_addr.addr6.sin6_addr) < 0) {
+			return -1;
+		}
+	} else if (inet == XDNS_INET4) {
+		xdns_client->fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+		if (xdns_client->fd < 0) {
+			return -1;
+		}
+		xdns_client->srv_addr.addr4.sin_family = AF_INET;
+		xdns_client->srv_addr.addr4.sin_port = htons(53);
+		xdns_client->srv_addr.addr4.sin_addr.s_addr = inet_addr(dns_server);
+	}
 
 	return 0;
 }
@@ -73,7 +90,7 @@ int xdns_client_query(struct xdns_client *xdns_client, uint16_t qtype, uint16_t 
 {
 	ssize_t ret;
 	unsigned char *record_pos;
-	socklen_t dest_len;
+	socklen_t srv_addr_len;
 
 	struct xdns_header *dns_header = NULL;
 	struct xdns_question *dns_question = NULL;
@@ -93,17 +110,32 @@ int xdns_client_query(struct xdns_client *xdns_client, uint16_t qtype, uint16_t 
 	xdns_client->slen = sizeof(struct xdns_header) + strlen((char *)xdns_client->qname) + 1 +
 			    sizeof(struct xdns_question);
 
-	ret = sendto(xdns_client->fd, (char *)xdns_client->sbuf, xdns_client->slen, 0,
-		     (struct sockaddr *)&xdns_client->dest, sizeof(xdns_client->dest));	
+	if (xdns_client->inet == XDNS_INET6) {
+		ret = sendto(xdns_client->fd, (char *)xdns_client->sbuf, xdns_client->slen, 0,
+			     (struct sockaddr *)&xdns_client->srv_addr.addr6,
+			     sizeof(xdns_client->srv_addr.addr6));
+	} else {
+		ret = sendto(xdns_client->fd, (char *)xdns_client->sbuf, xdns_client->slen, 0,
+			     (struct sockaddr *)&xdns_client->srv_addr.addr4,
+			     sizeof(xdns_client->srv_addr.addr4));
+	}
 
 	if (ret < 0) {
 		return -1;
 	}
 
-	dest_len = sizeof(xdns_client->dest);
-	ret = recvfrom(xdns_client->fd, (char *)xdns_client->rbuf, BUFF_SIZE, 0,
-			(struct sockaddr *)&xdns_client->dest, &dest_len);
-	
+	if (xdns_client->inet == XDNS_INET6) {
+		srv_addr_len = sizeof(xdns_client->srv_addr.addr6);
+		ret = recvfrom(xdns_client->fd, (char *)xdns_client->rbuf, BUFF_SIZE, 0,
+				(struct sockaddr *)&xdns_client->srv_addr.addr6,
+				&srv_addr_len);
+	} else {
+		srv_addr_len = sizeof(xdns_client->srv_addr.addr4);
+		ret = recvfrom(xdns_client->fd, (char *)xdns_client->rbuf, BUFF_SIZE, 0,
+				(struct sockaddr *)&xdns_client->srv_addr.addr4,
+				&srv_addr_len);
+	}
+
 	if (ret < 0) {
 		return -1;
 	}
