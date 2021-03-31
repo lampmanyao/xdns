@@ -21,25 +21,6 @@ static void usage()
 	exit(-1);
 }
 
-static int type2qtype(const char *type, uint16_t *qtype)
-{
-	int ret = 0;
-	if (strcmp(type, "A") == 0) {
-		*qtype = XDNS_TYPE_A;
-	} else if (strcmp(type, "AAAA") == 0) {
-		*qtype = XDNS_TYPE_AAAA;
-	} else if (strcmp(type, "MX") == 0) {
-		*qtype = XDNS_TYPE_MX;
-	} else if (strcmp(type, "HINFO") == 0) {
-		*qtype = XDNS_TYPE_HINFO;
-	} else if (strcmp(type, "CNAME") == 0) {
-		*qtype = XDNS_TYPE_CNAME;
-	} else {
-		ret = -1;
-	}
-
-	return ret;
-}
 
 int main(int argc, char **argv)
 {
@@ -100,7 +81,7 @@ int main(int argc, char **argv)
 	}
 
 	if (type) {
-		if (type2qtype(type, &qtype) != 0) {
+		if ((qtype = xdns_type2qtype(type)) == 0) {
 			printf("type: %s is not support yet\n", type);
 			exit(-1);
 		}

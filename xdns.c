@@ -33,7 +33,6 @@ static void print_hex(unsigned char *buff, size_t len);
 
 int xdns_client_init(struct xdns_client *xdns_client, const char *dns_server, int inet, const char *host)
 {
-	xdns_client->inet = inet;
 
 	strncpy(xdns_client->dns_server, dns_server, HOST_SIZE - 1);
 	xdns_client->dns_server[HOST_SIZE - 1] = '\0';
@@ -44,6 +43,8 @@ int xdns_client_init(struct xdns_client *xdns_client, const char *dns_server, in
 	xdns_client->answer_section = NULL;
 	xdns_client->authority_section = NULL;
 	xdns_client->additional_section = NULL;
+
+	xdns_client->inet = inet;
 
 	if (inet == XDNS_INET6) {
 		xdns_client->fd = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
@@ -84,6 +85,29 @@ void xdns_client_destroy(struct xdns_client *xdns_client)
 	section_free(xdns_client->authority_section);
 	section_free(xdns_client->additional_section);
 	close(xdns_client->fd);
+}
+
+uint16_t xdns_type2qtype(const char *type)
+{
+	if (strcmp(type, "A") == 0) {
+		return XDNS_TYPE_A;
+	} else if (strcmp(type, "AAAA") == 0) {
+		return XDNS_TYPE_AAAA;
+	} else if (strcmp(type, "MX") == 0) {
+		return XDNS_TYPE_MX;
+	} else if (strcmp(type, "HINFO") == 0) {
+		return XDNS_TYPE_HINFO;
+	} else if (strcmp(type, "MINFO") == 0) {
+		return XDNS_TYPE_MINFO;
+	} else if (strcmp(type, "CNAME") == 0) {
+		return XDNS_TYPE_CNAME;
+	} else if (strcmp(type, "WKS") == 0) {
+		return XDNS_TYPE_WKS;
+	} else if (strcmp(type, "TXT") == 0) {
+		return XDNS_TYPE_TXT;
+	} else {
+		return 0;
+	}
 }
 
 int xdns_client_query(struct xdns_client *xdns_client, uint16_t qtype, uint16_t qclass)

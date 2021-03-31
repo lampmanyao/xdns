@@ -140,22 +140,19 @@ struct xrecord {
 
 struct xdns_client {
 	int fd;
-
 	int inet; /* AF_INET or AF_INET6 */
-
 	union {
 		struct sockaddr_in addr4;
 		struct sockaddr_in6 addr6;
 	} srv_addr;
 
-	unsigned char *qname;
+	char dns_server[HOST_SIZE];
+	unsigned char host[HOST_SIZE];
 
+	unsigned char *qname;
 	struct xrecord *answer_section;
 	struct xrecord *authority_section;
 	struct xrecord *additional_section;
-
-	char dns_server[HOST_SIZE];
-	unsigned char host[HOST_SIZE];
 
 	size_t slen;
 	unsigned char sbuf[BUFF_SIZE];
@@ -167,6 +164,7 @@ struct xdns_client {
 int xdns_client_init(struct xdns_client *xdns_client, const char *dns_server, int inet, const char *host);
 void xdns_client_destroy(struct xdns_client *xdns_client);
 
+uint16_t xdns_type2qtype(const char *type);
 int xdns_client_query(struct xdns_client *xdns_client, uint16_t qtype, uint16_t qclass);
 void xdns_client_print_answer(struct xdns_client *xdns_client);
 void xdns_client_print_authority(struct xdns_client *xdns_client);
