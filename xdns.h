@@ -135,7 +135,6 @@ struct xrecord {
 		unsigned char *rname;   /* NS or cname rdata */
 		struct soa soa_data;
 	} rdata;
-	struct xrecord *next;
 };
 
 struct xdns_client {
@@ -150,9 +149,13 @@ struct xdns_client {
 	unsigned char host[HOST_SIZE];
 
 	unsigned char *qname;
-	struct xrecord *answer_section;
-	struct xrecord *authority_section;
-	struct xrecord *additional_section;
+
+	int an_count;
+	struct xrecord **answer_section;
+	int ns_count;
+	struct xrecord **authority_section;
+	int ar_count;
+	struct xrecord **additional_section;
 
 	size_t slen;
 	unsigned char sbuf[BUFF_SIZE];
