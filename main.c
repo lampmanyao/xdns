@@ -31,6 +31,9 @@ int main(int argc, char **argv)
 	int inet = XDNS_INET4;
 
 	struct xdns_client xdns_client;
+	struct xdns_request request;
+	struct xdns_response *response = NULL;
+
 	uint16_t qtype = XDNS_TYPE_A;  /* default query type */
 
 	struct boption opts[] = {
@@ -87,20 +90,31 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if (xdns_client_init(&xdns_client, server, inet, host) < 0) {
-		printf("xdns_client_init() error\n");
+	if (xdns_client_open(&xdns_client, server, inet) < 0) {
+		printf("xdns_client_open() error\n");
 		exit(-1);
 	}
 
-	if (xdns_client_query(&xdns_client, qtype, XDNS_CLASS_IN) < 0) {
-		printf("xdns_client_query() error\n");
-	} else {
-		xdns_client_print_answer(&xdns_client);
-		xdns_client_print_authority(&xdns_client);
-		xdns_client_print_additional(&xdns_client);
+	xdns_client_set_request(&request, host, qtype, XDNS_CLASS_IN);
+
+	if (xdns_client_send(&xdns_client, &request) < 0) {
+		goto out;
 	}
 
-	xdns_client_destroy(&xdns_client);
+	response = xdns_client_recv(&xdns_client);
+	if (!response) {
+		goto out;
+	}
+
+	xdns_response_print_answer(response);
+	xdns_response_print_authority(response);
+	xdns_response_print_additional(response);
+
+out:
+	xdns_client_close(&xdns_client);
+	if (response) {
+		xdns_response_destroy(response);
+	}
 
 	return 0;
 }

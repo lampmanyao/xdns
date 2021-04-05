@@ -113,6 +113,7 @@ struct xresource {
 };
 #pragma pack(pop)
 
+/* SOA rdata format */
 struct soa_resource {
 	uint32_t serial;
 	int32_t refresh;
@@ -127,13 +128,19 @@ struct soa {
 	struct soa_resource *resource;
 };
 
+struct mx {
+	int16_t preference;
+	unsigned char *exchange;
+};
+
 struct xrecord {
 	unsigned char *name;
 	struct xresource *resource;
 	union {
 		unsigned char *address;  /* A or AAAA rdata */
-		unsigned char *rname;   /* NS or cname rdata */
-		struct soa soa_data;
+		unsigned char *rname;    /* NS or cname rdata */
+		struct soa soa_data;     /* SOA rdata */
+		struct mx mx_data;       /* MX rdata */
 	} rdata;
 };
 
@@ -144,34 +151,43 @@ struct xdns_client {
 		struct sockaddr_in addr4;
 		struct sockaddr_in6 addr6;
 	} srv_addr;
-
 	char dns_server[HOST_SIZE];
-	unsigned char host[HOST_SIZE];
+};
 
-	unsigned char *qname;
+
+struct xdns_request {
+	struct xdns_header header;
+	struct xdns_question question;
+	unsigned char qname[HOST_SIZE];
+};
+
+struct xdns_response {
+	struct xdns_header header;
+
+	int qname_len;
+	unsigned char qname[HOST_SIZE];
+	struct xdns_question question;
 
 	int an_count;
 	struct xrecord **answer_section;
+
 	int ns_count;
 	struct xrecord **authority_section;
+
 	int ar_count;
 	struct xrecord **additional_section;
-
-	size_t slen;
-	unsigned char sbuf[BUFF_SIZE];
-
-	ssize_t rlen;
-	unsigned char rbuf[BUFF_SIZE];
 };
 
-int xdns_client_init(struct xdns_client *xdns_client, const char *dns_server, int inet, const char *host);
-void xdns_client_destroy(struct xdns_client *xdns_client);
-
 uint16_t xdns_type2qtype(const char *type);
-int xdns_client_query(struct xdns_client *xdns_client, uint16_t qtype, uint16_t qclass);
-void xdns_client_print_answer(struct xdns_client *xdns_client);
-void xdns_client_print_authority(struct xdns_client *xdns_client);
-void xdns_client_print_additional(struct xdns_client *xdns_client);
+int xdns_client_open(struct xdns_client *client, const char *dns_server, int inet);
+void xdns_client_close(struct xdns_client *client);
+void xdns_client_set_request(struct xdns_request *request, const char *host, uint16_t qtype, uint16_t qclass);
+int xdns_client_send(struct xdns_client *client, struct xdns_request *request);
+struct xdns_response *xdns_client_recv(struct xdns_client *client);
+void xdns_response_destroy(struct xdns_response *response);
+void xdns_response_print_answer(struct xdns_response *response);
+void xdns_response_print_authority(struct xdns_response *response);
+void xdns_response_print_additional(struct xdns_response *response);
 
 #endif  /* xdns_h */
 
