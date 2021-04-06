@@ -133,6 +133,11 @@ struct mx {
 	unsigned char *exchange;
 };
 
+struct txt {
+	uint8_t txt_len;
+	unsigned char *txt;
+};
+
 struct xrecord {
 	unsigned char *name;
 	struct xresource *resource;
@@ -141,6 +146,7 @@ struct xrecord {
 		unsigned char *rname;    /* NS or cname rdata */
 		struct soa soa_data;     /* SOA rdata */
 		struct mx mx_data;       /* MX rdata */
+		struct txt txt_data;     /* TXT rdata */
 	} rdata;
 };
 

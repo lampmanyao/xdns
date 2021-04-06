@@ -217,8 +217,11 @@ static void section_free(struct xrecord **record, int count)
 				free(curr->rdata.soa_data.rname);
 		} else if (curr->resource->type == XDNS_TYPE_MX) {
 			free(curr->rdata.mx_data.exchange);
+		} else if (curr->resource->type == XDNS_TYPE_TXT) {
+			free(curr->rdata.txt_data.txt);
 		} else {
-			printf("**WARN**: type(%d) unimplemented\n", curr->resource->type);
+			printf("%s:%d **WARN**: type(%d) unimplemented\n",
+				__FILE__, __LINE__, curr->resource->type);
 		}
 
 		free(curr);
@@ -391,8 +394,10 @@ void xdns_response_print_answer(struct xdns_response *response)
 		} else if (type == XDNS_TYPE_MX) {
 			printf("PREFERENCE: %d MX %s", record[i]->rdata.mx_data.preference,
 				record[i]->rdata.mx_data.exchange);
+		} else if (type == XDNS_TYPE_TXT) {
+			printf("TXT \"%s\"", record[i]->rdata.txt_data.txt);
 		} else {
-			printf("**WARN**: type(%d) unimplemented\n", type);
+			printf("%s:%d **WARN**: type(%d) unimplemented\n", __FILE__, __LINE__, type);
 		}
 
 		printf("\n");
@@ -421,7 +426,7 @@ void xdns_response_print_authority(struct xdns_response *response)
 				record[i]->rdata.soa_data.resource->expire,
 				record[i]->rdata.soa_data.resource->minimum);
 		} else {
-			printf("**WARN**: type(%d) unimplemented\n", type);
+			printf("%s:%d **WARN**: type(%d) unimplemented\n", __FILE__, __LINE__, type);
 		}
 
 		printf("\n");
@@ -443,7 +448,7 @@ void xdns_response_print_additional(struct xdns_response *response)
 			addr.sin_addr.s_addr = *(in_addr_t *)record[i]->rdata.address;
 			printf("has IPv4 address: %s", inet_ntoa(addr.sin_addr));
 		} else {
-			printf("**WARN**: type(%d) unimplemented\n", type);
+			printf("%s:%d **WARN**: type(%d) unimplemented\n", __FILE__, __LINE__, type);
 		}
 		printf("\n");
 	}
@@ -532,9 +537,15 @@ static void parse_response(struct xdns_response *response, unsigned char **recor
 			*record_pos += 2;
 			answer->rdata.mx_data.exchange = parse_name(*record_pos, buffer, &offset);
 			*record_pos = *record_pos + offset;
+		} else if (answer->resource->type == XDNS_TYPE_TXT) {
+			answer->rdata.txt_data.txt_len = *(uint8_t *)(*record_pos);
+			answer->rdata.txt_data.txt = parse_name(*record_pos, buffer, &offset);
+			*record_pos = *record_pos + offset;
 		} else {
-			printf("**WARN**: type(%d) unimplemented\n", answer->resource->type);
+			printf("%s:%d **WARN**: type(%d) unimplemented\n",
+				__FILE__, __LINE__, answer->resource->type);
 		}
+
 		response->answer_section[i] = answer;
 	}
 
@@ -572,7 +583,7 @@ static void parse_response(struct xdns_response *response, unsigned char **recor
 			auth->rdata.soa_data.resource->expire = ntohl(auth->rdata.soa_data.resource->expire);
 			auth->rdata.soa_data.resource->minimum = ntohl(auth->rdata.soa_data.resource->minimum);
 		} else {
-			printf("**WARN**: type(%d) unimplemented\n", auth->resource->type);
+			printf("%s:%d **WARN**: type(%d) unimplemented\n", __FILE__, __LINE__, auth->resource->type);
 		}
 		response->authority_section[i] = auth;
 	}
