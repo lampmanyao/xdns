@@ -84,6 +84,8 @@ uint16_t xdns_type2qtype(const char *type)
 		return XDNS_TYPE_WKS;
 	} else if (strcmp(type, "TXT") == 0) {
 		return XDNS_TYPE_TXT;
+	} else if (strcmp(type, "NS") == 0) {
+		return XDNS_TYPE_NS;
 	} else {
 		return 0;
 	}
@@ -240,7 +242,7 @@ static void print_hex(unsigned char *buff, size_t len)
 
 	int linenum = 0;
 	for (size_t i = 0; i < nline; i++) {
-		printf("%08x  ", linenum++);
+		printf("%08x  ", linenum);
 		for (int j = 0; j < 16; j++) {
 			printf("%02x ", *c++);
 		}
@@ -256,6 +258,7 @@ static void print_hex(unsigned char *buff, size_t len)
 			h++;
 		}
 		printf("\n");
+		linenum = (i + 1) * 16;
 	}
 
 	printf("%08x  ", linenum++);
@@ -364,6 +367,7 @@ struct xdns_response *xdns_client_recv(struct xdns_client *client)
 
 	print_dns_header(&response->header);
 	print_dns_question(&response->question);
+
 	print_hex((unsigned char *)buff, ret);
 
 	return response;
@@ -396,6 +400,8 @@ void xdns_response_print_answer(struct xdns_response *response)
 				record[i]->rdata.mx_data.exchange);
 		} else if (type == XDNS_TYPE_TXT) {
 			printf("TXT \"%s\"", record[i]->rdata.txt_data.txt);
+		} else if (type == XDNS_TYPE_NS) {
+			printf("NS %s", record[i]->rdata.rname);
 		} else {
 			printf("%s:%d **WARN**: type(%d) unimplemented\n", __FILE__, __LINE__, type);
 		}
