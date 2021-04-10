@@ -150,17 +150,6 @@ struct xrecord {
 	} rdata;
 };
 
-struct xdns_client {
-	int fd;
-	int inet; /* AF_INET or AF_INET6 */
-	union {
-		struct sockaddr_in addr4;
-		struct sockaddr_in6 addr6;
-	} srv_addr;
-	char dns_server[HOST_SIZE];
-};
-
-
 struct xdns_request {
 	struct xdns_header header;
 	struct xdns_question question;
@@ -184,9 +173,19 @@ struct xdns_response {
 	struct xrecord **additional_section;
 };
 
-uint16_t xdns_type2qtype(const char *type);
-int xdns_client_open(struct xdns_client *client, const char *dns_server, int inet);
+struct xdns_client {
+	int fd;
+	int inet; /* AF_INET or AF_INET6 */
+	union {
+		struct sockaddr_in addr4;
+		struct sockaddr_in6 addr6;
+	} srv_addr;
+	char dns_server[HOST_SIZE];
+};
+
+int xdns_client_open(struct xdns_client *client, const char *dns_server, int inet, int timeout);
 void xdns_client_close(struct xdns_client *client);
+uint16_t xdns_type2qtype(const char *type);
 void xdns_client_set_request(struct xdns_request *request, const char *host, uint16_t qtype, uint16_t qclass);
 int xdns_client_send(struct xdns_client *client, struct xdns_request *request);
 struct xdns_response *xdns_client_recv(struct xdns_client *client);

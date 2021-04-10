@@ -28,9 +28,8 @@ static void print_hex(unsigned char *buff, size_t len);
 static void parse_response(struct xdns_response *response, unsigned char **record_pos, unsigned char *buffer);
 
 
-int xdns_client_open(struct xdns_client *client, const char *dns_server, int inet)
+int xdns_client_open(struct xdns_client *client, const char *dns_server, int inet, int timeout)
 {
-
 	strncpy(client->dns_server, dns_server, HOST_SIZE - 1);
 	client->dns_server[HOST_SIZE - 1] = '\0';
 
@@ -57,6 +56,17 @@ int xdns_client_open(struct xdns_client *client, const char *dns_server, int ine
 		client->srv_addr.addr4.sin_port = htons(53);
 		client->srv_addr.addr4.sin_addr.s_addr = inet_addr(dns_server);
 	}
+
+	struct timeval tv = {
+		.tv_sec = timeout,
+		.tv_usec = 0,
+	};
+
+	if (setsockopt(client->fd, SOL_SOCKET, SO_RCVTIMEO, (char *)&tv, sizeof(tv)) < 0)
+		printf("setsockopt(SO_RCVTIMEO) failed: %d\n", errno);
+
+	if (setsockopt(client->fd, SOL_SOCKET, SO_SNDTIMEO, (char *)&tv, sizeof(tv)) < 0)
+		printf("setsockopt(SO_SNDTIMEO) failed: %d\n", errno);
 
 	return 0;
 }
