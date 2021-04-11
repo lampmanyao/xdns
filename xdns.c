@@ -334,9 +334,8 @@ int xdns_client_send(struct xdns_client *client, struct xdns_request *request)
 }
 
 
-struct xdns_response *xdns_client_recv(struct xdns_client *client)
+int xdns_client_recv(struct xdns_client *client, struct xdns_response *response)
 {
-	struct xdns_response *response = NULL;
 	ssize_t ret;
 	socklen_t srv_addr_len;
 	unsigned char *record_pos;
@@ -355,10 +354,8 @@ struct xdns_response *xdns_client_recv(struct xdns_client *client)
 	}
 
 	if (ret < 0) {
-		return response;
+		return -1;
 	}
-
-	response = calloc(1, sizeof(struct xdns_response));
 
 	/* header */
 	memcpy(&response->header, (struct xdns_header *)buff, sizeof(struct xdns_header));
@@ -380,7 +377,7 @@ struct xdns_response *xdns_client_recv(struct xdns_client *client)
 
 	print_hex((unsigned char *)buff, ret);
 
-	return response;
+	return 0;
 }
 
 void xdns_response_print_answer(struct xdns_response *response)
@@ -475,7 +472,6 @@ void xdns_response_destroy(struct xdns_response *response)
 	section_free(response->answer_section, response->an_count);
 	section_free(response->authority_section, response->ns_count);
 	section_free(response->additional_section, response->ar_count);
-	free(response);
 }
 
 static int parse_qname(unsigned char *qname, unsigned char *buffer)

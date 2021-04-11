@@ -33,9 +33,10 @@ int main(int argc, char **argv)
 	int inet = XDNS_INET4;
 	int default_timeout = 3;
 
+	int ret;
 	struct xdns_client xdns_client;
 	struct xdns_request request;
-	struct xdns_response *response = NULL;
+	struct xdns_response response;
 
 	uint16_t qtype = XDNS_TYPE_A;  /* default query type */
 
@@ -99,30 +100,29 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if (xdns_client_open(&xdns_client, server, inet, default_timeout) < 0) {
+	if (( ret = xdns_client_open(&xdns_client, server, inet, default_timeout)) < 0) {
 		printf("xdns_client_open() error\n");
 		exit(-1);
 	}
 
 	xdns_client_set_request(&request, host, qtype, XDNS_CLASS_IN);
 
-	if (xdns_client_send(&xdns_client, &request) < 0) {
+	if ((ret = xdns_client_send(&xdns_client, &request)) < 0) {
 		goto out;
 	}
 
-	response = xdns_client_recv(&xdns_client);
-	if (!response) {
+	if ((xdns_client_recv(&xdns_client, &response)) < 0) {
 		goto out;
 	}
 
-	xdns_response_print_answer(response);
-	xdns_response_print_authority(response);
-	xdns_response_print_additional(response);
+	xdns_response_print_answer(&response);
+	xdns_response_print_authority(&response);
+	xdns_response_print_additional(&response);
 
 out:
 	xdns_client_close(&xdns_client);
-	if (response) {
-		xdns_response_destroy(response);
+	if (ret == 0) {
+		xdns_response_destroy(&response);
 	}
 
 	return 0;

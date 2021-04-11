@@ -188,7 +188,7 @@ void xdns_client_close(struct xdns_client *client);
 uint16_t xdns_type2qtype(const char *type);
 void xdns_client_set_request(struct xdns_request *request, const char *host, uint16_t qtype, uint16_t qclass);
 int xdns_client_send(struct xdns_client *client, struct xdns_request *request);
-struct xdns_response *xdns_client_recv(struct xdns_client *client);
+int xdns_client_recv(struct xdns_client *client, struct xdns_response *response);
 void xdns_response_destroy(struct xdns_response *response);
 void xdns_response_print_answer(struct xdns_response *response);
 void xdns_response_print_authority(struct xdns_response *response);
